@@ -147,6 +147,7 @@ class Sudoku {
     freshProperty() {
         for (var i = 0; i < 9; i++) {
             for (var j = 0; j < 9; j++) {
+                // console.log(i, j ,this.getData(i,j))
                 if (this.boardData[i][j].cat == false) {
                     this.boardData[i][j].color = 1;
                 } else {
@@ -381,6 +382,7 @@ var NowTime;
 var cacheData = '';
 var restoreData = '';
 var newGameObject, newGameData, newGameAns;
+var guide = true
 
 Page({
     data: {
@@ -388,10 +390,47 @@ Page({
         timeText: '00:00',
         timeShowOrNot: true,
         completed: false,
-        note: false
+        note: false,
+        noteButton: false,
+        noteFill: true,
+        noteFull: true,
+        hightlg: true,
+        hightnum: true,
+        guide: -1
+    },
+
+    toNextGuide(){
+        let temp = this.data.guide + 1
+        if(temp == 5){
+            this.changeNote()
+        } else if (temp == 6) {
+            sudoku.setData(1, 3, '237', true)
+            this.freshUI()
+            console.log(123)
+        } else if (temp == 7) {
+
+            this.changeNote()
+        } else if (temp == 8) {
+            this.selectNum = 2
+            this.drawTable
+            sudoku.highlightNum(1)
+            this.freshUI()
+            console.log(123)
+        } else if (temp == 10) {
+            wx.setStorageSync('guide','0')
+            this.newGame(false)
+            sudoku.setGame(newGameData, newGameAns);
+        }
+        console.log(this.data.guide)
+        this.setData({
+            guide: temp
+        })
+        console.log(this.data.guide)
+
     },
 
     onLoad(option) {
+        let timeStop = false
         cacheData = option.cache
         if(cacheData != undefined) {
           gameID = parseInt(cacheData.substring(0, 4))
@@ -407,30 +446,50 @@ Page({
         errorShow = getApp().globalData.errorOrNot;
         timeShow = getApp().globalData.timeOrNot;
         filltype = getApp().globalData.typeOrNot;
+        let that = this
+        try{
+          var value = wx.getStorageSync('guide')
+          console.log("in Load the storage is :", value)
+          if(value == '') {
+            that.setData({
+                guide: 0
+            })
+            timeStop = true
+          }
+        } catch(e) {
+            console.log(e)
+        }
         
         this.setData({
-            timeShowOrNot: timeShow
+            timeShowOrNot: timeShow,
+            noteButton: !guide,
+            noteFill: true,
+            noteFull: true,
+            hightlg: true,
+            hightnum: true
         });
-        this.newGame();
+        this.newGame(timeStop);
         if(cacheData != undefined) {
           var nowNote = currentNote
           for (var i = 4; i < cacheData.length; i += 4) {
             currentNote = (cacheData[i] == '-' ? false : true)
             sudoku.setData(parseInt(cacheData[i + 1]), parseInt(cacheData[i + 2]),
               parseInt(cacheData[i + 3]), currentNote)
+              sudoku.freshProperty()
+               
             console.log(parseInt(cacheData[i + 1]), parseInt(cacheData[i + 2]),
               parseInt(cacheData[i + 3]), currentNote)
           }
           this.freshUI()
           currentNote = nowNote
-        }
+          if(timeStop)  {
+              this.timeStop()
+              console.log("time Stop")
+          }
+        } 
     },
 
-    newGame() {
-        this.setData({
-            generateOk: false
-        })
-        sudoku.reset();
+    newGame(timeStop) {
         sudoku.reset();
         this.timeStop();
         timer = '0';
@@ -444,9 +503,15 @@ Page({
         this.setData({
             timeText: '00:00'
         })
-
         if(gameID>9868){
             gameID=gameID-869;
+        }
+        try {
+          var value = wx.getStorageSync('guide')
+          if(value == '')
+            gameID = 1
+        } catch(e) {
+            console.log(e)
         }
         wx.request({
           url: 'https://www.tianzhipengfei.xin/sudoku',
@@ -583,7 +648,8 @@ Page({
                     })
                     this.drawBoard();
                     this.drawTable();
-                    this.timeStart();
+                    if(!timeStop)
+                        this.timeStart();
                     this.freshUI();
                 }, 1200);
             }
@@ -614,13 +680,17 @@ Page({
         table.setTextAlign = 'center';
         //Zixuan table 里非选择数字的颜色
         table.setFillStyle("#4169E1")
-        let adjustmentForTable = [1.4, 2.35, 3.35, 4.3, 0.3, 1.3, 2.3, 3.32, 4.4]
-        for (var i = 1; i < 10; i++) {
+        let adjustmentForTable = [0.3, 1.4, 2.35, 3.35, 4.3, 0.3, 1.3, 2.3, 3.32, 4.4]
+        for (var i = 0; i < 10; i++) {
             if (i == num) {
                 //Zixuan，table 选中数字的颜色
                 table.setFillStyle("#64A36F");
             }
-            table.fillText(i.toString(), tableWidth / ratio * adjustmentForTable[i - 1] + lineWidth1 / ratio * i % 5, tableWidth * (3.2 + parseInt(i / 5) * 3.95) / 4 / ratio);
+            if(i == 0 ){
+                table.fillText("X", tableWidth / ratio * adjustmentForTable[i ] + lineWidth1 / ratio * i % 5, tableWidth * (3.2 + parseInt(i / 5) * 3.95) / 4 / ratio);
+            }else{
+            table.fillText(i.toString(), tableWidth / ratio * adjustmentForTable[i ] + lineWidth1 / ratio * i % 5, tableWidth * (3.2 + parseInt(i / 5) * 3.95) / 4 / ratio);
+            }
             //Zixuan table 里非选择数字的颜色
             table.setFillStyle("#4169E1");
         }
@@ -719,8 +789,11 @@ Page({
         if (sameNumHighlight) {
             sudoku.highlightNum(selectNum);
         } 
-        if (errorShow){
-            sudoku.judgeError();
+        if (errorShow) {
+            sudoku.judgeError()
+            if (level >= 5) {
+                sudoku.freshDiagonal()
+            }
         }
         if (filltype && selectX != -1 && selectY != -1) {
           var note = (currentNote == true ? '+' : '-')
@@ -914,7 +987,7 @@ Page({
                     wx.setStorage({
                       key: 'key',
                       data: storage + mutiDraw.levelImgPath(level) + '|' + mutiDraw.levelTranslation(level) + '|' + 
-                      that.data.timeText + '|' + mutiDraw.getNowFormatDate()
+                      that.data.timeText + '|' + mutiDraw.getNowFormatDate()+ '|0'
                     })
                   }
                 })
@@ -953,14 +1026,12 @@ Page({
     },
 
     fillColor(board, x, y) {
-      if(x == -1)
+      if(x == -1){
         return
-      if(sudoku.getData(x,y).cat == false)
+      }
+      if(sudoku.getData(x,y).cat == false){
         return
-    //   if(fillOrNot) {
-    //     fillOrNot = false
-    //     return
-    //   }
+      }
         var pointX = (cellWidth * selectY + (1 + parseInt(selectY / 3)) * lineWidth1 + (selectY - parseInt(selectY / 3) * lineWidth2)) 
         if (selectY == 8)
             pointX = pointX + 2
@@ -1017,7 +1088,69 @@ Page({
         wx.navigateBack({
             delta: 5
         })
-    }
+    },
+    // noteGuide: function(e) {
+    //   this.setData({
+    //     noteButton: true,
+    //     noteFill: false
+    //   })
+    // },
+    // noteFGuide: function(e) {
+    //   //console.log('abc')
+    //   this.setData({
+    //     noteFill: true,
+    //     noteFull: false
+    //   })
+    // },
+    // noteFuGuide: function(e) {
+    //   this.setData({
+    //     noteFull: true,
+    //   })
+    //   sudoku.setData(1, 3, '237', true)
+    //   this.freshUI()
+    //   setTimeout(() => {
+    //     this.setData({ hightlg: false })}, 1200)
+    //   /*
+    //   wx.setStorage({
+    //     key: 'guide',
+    //     data: 'value'
+    //   })
+    //   */
+    // },
+    // hightGuide: function(e) {
+    //   this.setData({
+    //     hightlg: true,
+    //     hightnum: false
+    //   })
+    // },
+    // hightFill: function(e) {
+    //   this.setData({
+    //     hightnum: true
+    //   })
+    //   selectNum = 1
+    //   this.drawTable(selectNum)
+    //   sudoku.highlightNum(selectNum)
+    //   this.freshUI()
+    //   wx.setStorage({
+    //     key: 'guide',
+    //     data: 'value',
+    //   })
+    //   setTimeout(() => {
+    //     wx.showModal({
+    //       title: '提示',
+    //       content: '更多模式可前往设置页面调整',
+    //       showCancel: false,
+    //       success: function (res) {
+    //         if (res.confirm) {
+    //           wx.redirectTo({
+    //             url: '/pages/select_level/select_level'
+    //           })
+    //         }
+    //       }
+    //     })
+    //   }, 1200)
+
+    // }
 })
 
 
@@ -1047,12 +1180,9 @@ function paint() {
   ctx.setFillStyle('#000000')
   ctx.fillText('用时:' + usedTime, (164) / ratio, (phoneHeight * 0.41))
 
-  ctx.fillText('解决:' + gameLevel, (106) / ratio, phoneHeight * 0.445)
-  
-  //非PK版shareCard
-  // if (!isPk) {
-  //   ctx.fillText('PK 中Rank ' + rank, (120) / ratio, (phoneHeight * 0.22))
-  // }
+  ctx.fillText('完成:' + gameLevel, (106) / ratio, phoneHeight * 0.445)
+//   ctx.fillText('PK 中Rank ' + rank, (120) / ratio, (phoneHeight * 0.22))
+
   ctx.stroke();
   
   var QrCodeRadius = 200/2;//小程序码半径，275是小程序码边长
